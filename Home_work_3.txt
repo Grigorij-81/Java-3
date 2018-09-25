@@ -1,0 +1,234 @@
+Для сервера:
+
+public class ClientHandler {
+    private Server server;
+    private Socket socket;
+    private DataInputStream in;
+    private DataOutputStream out;
+    private String nick;
+    private BufferedWriter bw = null;
+
+    public String getNick() {
+        return nick;
+    }
+
+    public ClientHandler(Server server, Socket socket) {
+        try {
+            this.server = server;
+            this.socket = socket;
+            this.in = new DataInputStream(socket.getInputStream());
+            this.out = new DataOutputStream(socket.getOutputStream());
+            startWorkerThread();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void startWorkerThread() {
+        new Thread(() -> {
+            try {
+                while (true) {
+                    String msg = in.readUTF();
+                    if (msg.startsWith("/auth ")) {
+                        // /auth login1 pass1
+                        String[] tokens = msg.split(" ");
+                        String nick = server.getAuthHandler().getNickByLoginPass(tokens[1], tokens[2]);
+                        if (nick != null) {
+                            if (server.isNickBusy(nick)) {
+                                out.writeUTF("Учетная запись уже используется");
+                                continue;
+                            }
+                            out.writeUTF("/authok " + nick);
+                            this.nick = nick;
+                            server.getAuthHandler().getDataFromDB(this);
+                            
+                            //* вставить отправку лога
+                            server.subscribe(this);
+                            break;
+                        } else {
+                            out.writeUTF("Неверный логин/пароль");
+                        }
+                    }
+                }
+                while (true) {
+                    String msg = in.readUTF();
+//                    Запись в файл:
+//                    bw = new BufferedWriter(new FileWriter("History.txt", true));
+//                    bw.write(nick + ": " + msg + "\r\n");
+//                    bw.close();
+                    if (msg.startsWith("/")) {
+                        if (msg.startsWith("/w ")) {
+                            // /w nick2 hello hello
+                            String[] tokens = msg.split(" ", 3);
+                            server.getAuthHandler().sendDataInDB(this, tokens[1], tokens[2]);
+                            server.sendPrivateMsg(this, tokens[1], tokens[2]);
+                        }                        
+                    } else {
+                        server.getAuthHandler().sendDataInDB(this, msg);
+                        server.broadcastMsg(this, msg);
+                    }
+                    System.out.println(msg);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                closeConnection();
+            }
+        }).start();
+    }
+Методы sendMessage и сloseConnection - без изменений.
+
+public interface AuthHandler {
+    void start() throws ClassNotFoundException, SQLException;
+    String getNickByLoginPass(String login, String pass) throws SQLException;
+    void sendDataInDB(ClientHandler client, String to, String msg) throws SQLException;
+    void sendDataInDB(ClientHandler client, String msg) throws SQLException;
+    void getDataFromDB(ClientHandler client) throws SQLException;
+    void stop() throws SQLException;
+}
+
+public class UserAuthHandler implements AuthHandler {
+    private static Connection connection;
+    private static Statement stmt;
+
+    @Override
+    public void start() {
+        try {
+            Class.forName("org.sqlite.JDBC");
+            connection = DriverManager.getConnection("jdbc:sqlite:AuthDB.db");
+            stmt = connection.createStatement();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String getNickByLoginPass(String login, String pass){
+        String nick = null;
+        try {
+             PreparedStatement preparedStatement = connection.prepareStatement("SELECT Nickname FROM Users WHERE " +
+                    "login = ? AND Password = ?;");
+             preparedStatement.setString(1, login);
+             preparedStatement.setString(2, pass);
+             ResultSet resultSet = preparedStatement.executeQuery();
+             if(resultSet.next()){
+                 nick = resultSet.getString(1);
+             } else {
+                 return null;
+             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return nick;
+    }
+
+    @Override
+    public void sendDataInDB(ClientHandler client, String to, String msg){
+        String nickFrom = client.getNick();
+        try {
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO Message (\n" +
+                    "message, [from], [to]) VALUES (?, ?, ?);");
+            ps.setString(1, msg);
+            ps.setString(2, nickFrom);
+            ps.setString(3, to);
+            ps.executeUpdate();
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void sendDataInDB(ClientHandler client,  String msg){
+        String nickFrom = client.getNick();
+        try {
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO Message (\n" +
+                                   "message, [from], [to]) VALUES (?, ?, 'ALL');");
+            ps.setString(1, msg);
+            ps.setString(2, nickFrom);
+            ps.executeUpdate();
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void getDataFromDB(ClientHandler client){
+        String nick = client.getNick();
+        try {
+            PreparedStatement ps = connection.prepareStatement("SELECT message FROM Message WHERE " +
+                    "/*.... здесь закончил*/");
+            ps.setString(1, nick);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                System.out.println(rs.getString(1));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void stop(){
+        try {
+            stmt.close();
+            connection.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+
+
+Для клиента:
+    public void connect(CallbackArgs callMessageToTextArea, CallbackArgs callAuthOk, CallbackArgs callClientsList, CallbackArgs callDisconnect) {
+        try {
+            socket = new Socket("localhost", 8189);
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
+
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        while (true) {
+                            String str = in.readUTF();
+                            System.out.println(str);
+                            if (str.startsWith("/authok ")) {
+                                callAuthOk.callback(str.split(" ")[1]);
+                                break;
+                            }
+                            callMessageToTextArea.callback(str + "\n");
+                        }
+                        while (true) {
+                            String str = in.readUTF();
+                            if (str.startsWith("/")) {
+                                if (str.startsWith("/clientslist ")) {
+                                    String[] tokens = str.split(" ");
+                                    callClientsList.callback(tokens);
+                                }
+                            } else {
+// 				Запись в файл
+                                BufferedWriter bw = new BufferedWriter(new FileWriter("Local_History.txt", true));
+                                bw.write(str + "\r\n");
+                                bw.close();
+                                callMessageToTextArea.callback(str + "\n");
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        callDisconnect.callback();
+                        closeConnection();
+                    }
+                }
+            });
+            t.setDaemon(true);
+            t.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }

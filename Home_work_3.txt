@@ -1,4 +1,4 @@
-Для сервера:
+п»їР”Р»СЏ СЃРµСЂРІРµСЂР°:
 
 public class ClientHandler {
     private Server server;
@@ -35,24 +35,24 @@ public class ClientHandler {
                         String nick = server.getAuthHandler().getNickByLoginPass(tokens[1], tokens[2]);
                         if (nick != null) {
                             if (server.isNickBusy(nick)) {
-                                out.writeUTF("Учетная запись уже используется");
+                                out.writeUTF("РЈС‡РµС‚РЅР°СЏ Р·Р°РїРёСЃСЊ СѓР¶Рµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ");
                                 continue;
                             }
                             out.writeUTF("/authok " + nick);
                             this.nick = nick;
                             server.getAuthHandler().getDataFromDB(this);
                             
-                            //* вставить отправку лога
+                            //* РІСЃС‚Р°РІРёС‚СЊ РѕС‚РїСЂР°РІРєСѓ Р»РѕРіР°
                             server.subscribe(this);
                             break;
                         } else {
-                            out.writeUTF("Неверный логин/пароль");
+                            out.writeUTF("РќРµРІРµСЂРЅС‹Р№ Р»РѕРіРёРЅ/РїР°СЂРѕР»СЊ");
                         }
                     }
                 }
                 while (true) {
                     String msg = in.readUTF();
-//                    Запись в файл:
+//                    Р—Р°РїРёСЃСЊ РІ С„Р°Р№Р»:
 //                    bw = new BufferedWriter(new FileWriter("History.txt", true));
 //                    bw.write(nick + ": " + msg + "\r\n");
 //                    bw.close();
@@ -78,7 +78,7 @@ public class ClientHandler {
             }
         }).start();
     }
-Методы sendMessage и сloseConnection - без изменений.
+РњРµС‚РѕРґС‹ sendMessage Рё СЃloseConnection - Р±РµР· РёР·РјРµРЅРµРЅРёР№.
 
 public interface AuthHandler {
     void start() throws ClassNotFoundException, SQLException;
@@ -160,7 +160,7 @@ public class UserAuthHandler implements AuthHandler {
         String nick = client.getNick();
         try {
             PreparedStatement ps = connection.prepareStatement("SELECT message FROM Message WHERE " +
-                    "/*.... здесь закончил*/");
+                    "/*.... Р·РґРµСЃСЊ Р·Р°РєРѕРЅС‡РёР»*/");
             ps.setString(1, nick);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
@@ -184,7 +184,7 @@ public class UserAuthHandler implements AuthHandler {
 }
 
 
-Для клиента:
+Р”Р»СЏ РєР»РёРµРЅС‚Р°:
     public void connect(CallbackArgs callMessageToTextArea, CallbackArgs callAuthOk, CallbackArgs callClientsList, CallbackArgs callDisconnect) {
         try {
             socket = new Socket("localhost", 8189);
@@ -211,7 +211,7 @@ public class UserAuthHandler implements AuthHandler {
                                     callClientsList.callback(tokens);
                                 }
                             } else {
-// 				Запись в файл
+// 				Р—Р°РїРёСЃСЊ РІ С„Р°Р№Р»
                                 BufferedWriter bw = new BufferedWriter(new FileWriter("Local_History.txt", true));
                                 bw.write(str + "\r\n");
                                 bw.close();

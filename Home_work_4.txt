@@ -1,4 +1,5 @@
-﻿1. public class Main {
+﻿
+1. public class Main {
     static Object monitor = new Object();
     static volatile char currentLetter = 'A';
     public static void main(String[] args) {

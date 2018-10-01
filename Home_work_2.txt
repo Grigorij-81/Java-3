@@ -1,0 +1,40 @@
+import java.sql.*;
+
+public class UserAuthHandler implements AuthHandler {
+
+    private static Connection connection;
+    private static Statement stmt;
+    private static PreparedStatement preparedStatement;
+
+    @Override
+    public void start() throws ClassNotFoundException, SQLException {
+            Class.forName("org.sqlite.JDBC");
+            connection = DriverManager.getConnection("jdbc:sqlite:AuthDB.db");
+            stmt = connection.createStatement();
+    }
+
+    @Override
+    public String getNickByLoginPass(String login, String pass){
+        String nick = null;
+        try {
+             preparedStatement = connection.prepareStatement("SELECT 1 FROM Users WHERE " +
+                    "login = ? AND Password = ?;");
+             preparedStatement.setString(1, login);
+             preparedStatement.setString(2, pass);
+             ResultSet resultSet = preparedStatement.executeQuery();
+             while (resultSet.next()){
+                 nick = resultSet.getString(1);
+             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return nick;
+    }
+
+    @Override
+    public void stop() throws SQLException {
+
+        stmt.close();
+        connection.close();
+    }
+}

@@ -1,0 +1,163 @@
+﻿
+1. public class Main {
+    static Object monitor = new Object();
+    static volatile char currentLetter = 'A';
+    public static void main(String[] args) {
+        new Thread(() -> {
+            try {
+                for (int i = 0; i < 5; i++) {
+                    synchronized (monitor){
+                        while (currentLetter != 'A'){
+                            monitor.wait();
+                        }
+                        System.out.println('A');
+                        currentLetter = 'B';
+                        monitor.notifyAll();
+                    }
+                }
+            } catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }).start();
+        new Thread(() -> {
+            try {
+                for (int i = 0; i < 5; i++) {
+                    synchronized (monitor){
+                        while (currentLetter != 'B'){
+                            monitor.wait();
+                        }
+                        System.out.println('B');
+                        currentLetter = 'C';
+                        monitor.notifyAll();
+                    }
+                }
+            } catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }).start();
+        new Thread(() -> {
+            try {
+                for (int i = 0; i < 5; i++) {
+                    synchronized (monitor){
+                        while (currentLetter != 'C'){
+                            monitor.wait();
+                        }
+                        System.out.println('C');
+                        currentLetter = 'A';
+                        monitor.notifyAll();
+                    }
+                }
+            } catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }).start();
+    }
+2.
+public class Server {
+    private ServerSocket serverSocket;
+    private AuthHandler authHandler;
+    private Vector<ClientHandler> clients;
+    private ExecutorService executorService;
+    public AuthHandler getAuthHandler() {
+        return authHandler;
+    }
+
+    public Server() {
+        try {
+            authHandler = new UserAuthHandler();
+            authHandler.start();
+            serverSocket = new ServerSocket(8189);
+            clients = new Vector<ClientHandler>();
+            executorService = Executors.newCachedThreadPool();
+            System.out.println("Сервер запущен");
+            while (true) {
+                Socket socket = serverSocket.accept();
+                System.out.println("Клиент подключился");                
+                executorService.execute(new ClientHandler(this, socket));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                serverSocket.close();
+                executorService.shutdown();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            try {
+                authHandler.stop();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+public class ClientHandler implements Runnable{
+    private Server server;
+    private Socket socket;
+    private DataInputStream in;
+    private DataOutputStream out;
+    private String nick;
+    private BufferedWriter bw = null;
+
+    public String getNick() {
+        return nick;
+    }
+
+    public ClientHandler(Server server, Socket socket) {
+        try {
+            this.server = server;
+            this.socket = socket;
+            this.in = new DataInputStream(socket.getInputStream());
+            this.out = new DataOutputStream(socket.getOutputStream());
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }       
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    String msg = in.readUTF();
+                    if (msg.startsWith("/auth ")) {                        
+                        String[] tokens = msg.split(" ");
+                        String nick = server.getAuthHandler().getNickByLoginPass(tokens[1], tokens[2]);
+                        if (nick != null) {
+                            if (server.isNickBusy(nick)) {
+                                out.writeUTF("Учетная запись уже используется");
+                                continue;
+                            }
+                            out.writeUTF("/authok " + nick);
+                            this.nick = nick;                            
+                            server.subscribe(this);
+                            break;
+                        } else {
+                            out.writeUTF("Неверный логин/пароль");
+                        }
+                    }
+                }
+                while (true) {
+                    String msg = in.readUTF();
+                    if (msg.startsWith("/")) {
+                        if (msg.startsWith("/w ")) {
+                            // /w nick2 hello hello
+                            String[] tokens = msg.split(" ", 3);
+                            server.getAuthHandler().sendDataInDB(this, tokens[1], tokens[2]);
+                            server.sendPrivateMsg(this, tokens[1], tokens[2]);
+                        }
+                        if(msg.startsWith("/changeNick")) {                            
+                        }
+                    } else {
+                        server.getAuthHandler().sendDataInDB(this, msg);
+                        server.broadcastMsg(this, msg);
+                    }
+                    System.out.println(msg);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                closeConnection();
+            }       
+    }

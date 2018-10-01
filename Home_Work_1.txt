@@ -1,0 +1,75 @@
+1. public static <T> void changeElements(T[] arr, int src, int dest) {
+        T temp = arr[src];
+        arr[src] = arr[dest];
+        arr[dest] = temp;
+    }
+
+2. public static <T> ArrayList convertArrayToArrayList(T[] arr) {
+        ArrayList<T> arrayList = new ArrayList<>(Arrays.asList(arr));
+        return arrayList;
+    }
+
+3. public class Fruit {
+    private float weight;
+    private String name;
+    public String getName() {return name;}
+    public float getWeight() {return weight;}
+}
+
+public class Apple extends Fruit {
+    private float weight = 1.0f;
+    private String name = "Apple";
+    @Override
+    public float getWeight() { return weight;}
+    @Override
+    public String getName() {return name;}
+}
+
+public class Orange extends Fruit {
+    private float weight = 1.5f;
+    private String name = "Orange";
+    @Override
+    public String getName() {return name;}
+    @Override
+    public float getWeight() {return weight;}
+}
+
+public class Box <T extends Fruit> {
+    private ArrayList <T> list = new ArrayList<>();
+
+    public ArrayList<T> getList() {return list;}
+
+    boolean addFruit (T fruit){
+        if (this.list.isEmpty() || fruit.getClass() == this.list.get(0).getClass()){
+            this.list.add(fruit);
+            return true;
+        } else {
+            System.out.println("In this box stores " + list.get(0).getName() +
+                    " and you want to put " + fruit.getName());
+            return false;
+        }
+    }
+
+    float getWeight() {
+        float weight = 0.0f;
+        for (T o: list) {
+            weight += o.getWeight();
+        }
+        return weight;
+    }
+
+    boolean compare(Box box){return Math.abs(this.getWeight() - box.getWeight()) < 0.001;}   
+
+    boolean shiftFromBox(Box <T> box){
+        if (box.list.isEmpty() || this.list.get(0).getClass() == box.list.get(0).getClass()){
+            box.list.addAll(this.list);
+            this.list.clear();
+            return true;
+        } else {
+            System.out.println("It is impossible to put " + this.list.get(0).getName() +
+                    " in box with " + box.list.get(0).getName());
+            return false;
+        }
+    }
+}
+// Мейн с вызовами не приводил.

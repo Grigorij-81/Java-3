@@ -1,0 +1,106 @@
+﻿//Home_work_lesson_7
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface Test {
+    int priority() default 1;
+}
+/////////////////////////////////////////////////
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface BeforeSuite {
+}
+/////////////////////////////////////////////////
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface AfterSuite {
+}
+/////////////////////////////////////////////////
+
+public class ClassForTest {
+    @BeforeSuite
+    public void methodBeforeSuite(){
+        System.out.println(this.getClass() + " methodBeforeSuite");
+    }
+
+//    @BeforeSuite
+//    public void methodBeforeSuiteSecond(){
+//        System.out.println(this.getClass() + " methodBeforeSuiteSecond");
+//    }
+
+    @Test(priority = 3)
+    public void methodOne(){
+        System.out.println(this.getClass() + " methodOne");
+    }
+
+    @Test(priority = 6)
+    public void methodTwo(){
+        System.out.println(this.getClass() + " methodTwo");
+    }
+
+    @Test(priority = 9)
+    public void methodThree(){
+        System.out.println(this.getClass() + " methodThree");
+    }
+
+    @AfterSuite
+    public void methodAfterSuite(){
+        System.out.println(this.getClass() + " methodAfterSuite");
+    }
+}
+/////////////////////////////////////////////////
+
+import java.lang.reflect.Method;
+
+public class Processor {
+    public static void processing(Class c) throws Exception {
+        Method[] methods = c.getDeclaredMethods();
+        ClassForTest classForTest = (ClassForTest) c.newInstance();
+        int countBefore = 0;
+        int countAfter = 0;
+
+        for (Method m : methods) {
+            if (m.isAnnotationPresent(BeforeSuite.class)) {
+                countBefore ++;
+                if (countBefore > 1){
+                    throw new RuntimeException("Second method BeforeSuite");
+                }
+                m.invoke(classForTest);
+            }
+        }
+
+        for (int i = 10; i >=0 ; i--) {
+            for (int j = 0; j < methods.length; j++) {
+                if (methods[j].isAnnotationPresent(Test.class)) {
+                    Test test = methods[j].getAnnotation(Test.class);
+                    if (i == test.priority()){
+                        methods[j].invoke(classForTest);
+                    }
+                }
+            }
+        }
+
+ 	for (Method m : methods) {
+            if (m.isAnnotationPresent(AfterSuite.class)) {
+                countAfter ++;
+                if (countAfter > 1){
+                    throw new RuntimeException("Second method AfterSuit");
+                }
+                m.invoke(classForTest);
+            }
+        }
+    }
+}
+/////////////////////////////////////////////////
+public class Main {
+    public static void main(String[] args) {
+        try {
+            Processor.processing(ClassForTest.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
